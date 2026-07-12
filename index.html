@@ -82,6 +82,7 @@
     <button class="btn ghost" id="wa">WhatsApp</button>
     <button class="btn ghost" id="refresh">↻ Atualizar agora</button>
     <button class="btn ghost" id="toggleCfg">🔑 Cookie</button>
+    <button class="btn ghost" id="toggleUrl">⚙️ URL</button>
   </div>
 
   <div class="cfg" id="cfg">
@@ -109,8 +110,8 @@ let timer=null, lastData=null;
 function toast(m){$('toast').textContent=m;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),1600);}
 
 function init(){
-  if(API){$('setup').style.display='none';$('apiUrl').value=API;start();}
-  else{$('setup').style.display='block';$('report').textContent='Configure a URL do Web App para começar.';}
+  if(API && /\/exec$/.test(API)){$('setup').style.display='none';$('apiUrl').value=API;start();}
+  else{API='';localStorage.removeItem(LS_URL);$('setup').style.display='block';$('report').textContent='Configure a URL do Web App para começar.';}
 }
 $('saveUrl').onclick=()=>{
   const u=$('apiUrl').value.trim();
@@ -118,6 +119,7 @@ $('saveUrl').onclick=()=>{
   API=u;localStorage.setItem(LS_URL,u);$('setup').style.display='none';start();
 };
 $('toggleCfg').onclick=()=>$('cfg').classList.toggle('show');
+$('toggleUrl').onclick=()=>{const s=$('setup');s.style.display=s.style.display==='none'?'block':'none';};
 
 function start(){ fetchReport(); if(timer)clearInterval(timer); timer=setInterval(fetchReport,60000); }
 $('refresh').onclick=fetchReport;
@@ -188,14 +190,25 @@ $('wa').onclick=()=>{const t=($('report').dataset.raw||'').replace(/📦|⏳|�
 
 $('sendCookie').onclick=async()=>{
   const c=$('cookieIn').value.trim();
+  if(!API){$('cookieMsg').textContent='Configure a URL do Web App primeiro (campo de cima).';$('cookieMsg').className='msg err';$('setup').style.display='block';return;}
   if(!c){$('cookieMsg').textContent='Cole o cookie.';$('cookieMsg').className='msg err';return;}
   $('cookieMsg').textContent='Enviando…';$('cookieMsg').className='msg';
+  // usa POST no-cors: o Apps Script salva, mas o navegador não deixa ler a resposta.
+  // por isso, depois de enviar, confirmamos chamando o report de novo.
   try{
-    const r=await fetch(API+'?action=savecookie&cookie='+encodeURIComponent(c));
-    const d=await r.json();
-    if(d.ok){$('cookieMsg').textContent='✓ Cookie salvo!';$('cookieMsg').className='msg ok';$('cookieIn').value='';setTimeout(fetchReport,800);}
-    else{$('cookieMsg').textContent='Faltando: '+(d.faltando||[]).join(', ');$('cookieMsg').className='msg err';}
-  }catch(e){$('cookieMsg').textContent='Erro ao enviar.';$('cookieMsg').className='msg err';}
+    await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({cookie:c})});
+    $('cookieMsg').textContent='Enviado. Verificando…';
+    // dá um tempo pro Apps Script gravar e testa buscando o report
+    setTimeout(async()=>{
+      try{
+        const r=await fetch(API+'?action=report&t='+Date.now());
+        const d=await r.json();
+        if(d.ok){$('cookieMsg').textContent='✓ Cookie salvo e funcionando!';$('cookieMsg').className='msg ok';$('cookieIn').value='';lastData=d;render(d);setLive(true,d.atualizado_em);$('cfg').classList.remove('show');}
+        else if(d.erro==='cookie_ausente_ou_incompleto'){$('cookieMsg').textContent='Cookie incompleto — copie TODOS os cookies do spx.shopee.com.br.';$('cookieMsg').className='msg err';}
+        else{$('cookieMsg').textContent='Salvo, mas SPX retornou: '+(d.erro||'erro');$('cookieMsg').className='msg err';}
+      }catch(e){$('cookieMsg').textContent='Enviado, mas não consegui confirmar (veja a URL).';$('cookieMsg').className='msg err';}
+    },1500);
+  }catch(e){$('cookieMsg').textContent='Falha ao enviar. Confira a URL do Web App.';$('cookieMsg').className='msg err';}
 };
 
 init();
