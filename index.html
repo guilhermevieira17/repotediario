@@ -124,14 +124,19 @@ $('toggleUrl').onclick=()=>{const s=$('setup');s.style.display=s.style.display==
 function start(){ fetchReport(); if(timer)clearInterval(timer); timer=setInterval(fetchReport,60000); }
 $('refresh').onclick=fetchReport;
 
-async function fetchReport(){
+function fetchReport(){
   if(!API)return;
-  try{
-    const r=await fetch(API+'?action=report&t='+Date.now());
-    const d=await r.json();
-    if(!d.ok){ handleErr(d.erro||'erro'); return; }
+  var cbName='_spxcb_'+Date.now();
+  window[cbName]=function(d){
+    delete window[cbName];
+    if(!d||!d.ok){ handleErr(d?d.erro||'erro':'erro'); return; }
     lastData=d; render(d); setLive(true,d.atualizado_em);
-  }catch(e){ handleErr('sem_conexao'); }
+  };
+  var s=document.createElement('script');
+  s.src=API+'?action=report&callback='+cbName+'&t='+Date.now();
+  s.onerror=function(){ delete window[cbName]; handleErr('sem_conexao'); };
+  document.head.appendChild(s);
+  setTimeout(function(){ try{document.head.removeChild(s);}catch(e){} },15000);
 }
 
 function handleErr(code){
@@ -188,27 +193,22 @@ Início da expedição: 05:00
 $('copy').onclick=()=>{navigator.clipboard.writeText($('report').dataset.raw||'');toast('Copiado');};
 $('wa').onclick=()=>{const t=($('report').dataset.raw||'').replace(/📦|⏳|🖥️|📍|🚘/g,'').trim();window.open('https://wa.me/?text='+encodeURIComponent($('report').dataset.raw||''),'_blank');};
 
-$('sendCookie').onclick=async()=>{
-  const c=$('cookieIn').value.trim();
+$('sendCookie').onclick=function(){
+  var c=$('cookieIn').value.trim();
   if(!API){$('cookieMsg').textContent='Configure a URL do Web App primeiro (campo de cima).';$('cookieMsg').className='msg err';$('setup').style.display='block';return;}
   if(!c){$('cookieMsg').textContent='Cole o cookie.';$('cookieMsg').className='msg err';return;}
   $('cookieMsg').textContent='Enviando…';$('cookieMsg').className='msg';
-  // usa POST no-cors: o Apps Script salva, mas o navegador não deixa ler a resposta.
-  // por isso, depois de enviar, confirmamos chamando o report de novo.
-  try{
-    await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({cookie:c})});
-    $('cookieMsg').textContent='Enviado. Verificando…';
-    // dá um tempo pro Apps Script gravar e testa buscando o report
-    setTimeout(async()=>{
-      try{
-        const r=await fetch(API+'?action=report&t='+Date.now());
-        const d=await r.json();
-        if(d.ok){$('cookieMsg').textContent='✓ Cookie salvo e funcionando!';$('cookieMsg').className='msg ok';$('cookieIn').value='';lastData=d;render(d);setLive(true,d.atualizado_em);$('cfg').classList.remove('show');}
-        else if(d.erro==='cookie_ausente_ou_incompleto'){$('cookieMsg').textContent='Cookie incompleto — copie TODOS os cookies do spx.shopee.com.br.';$('cookieMsg').className='msg err';}
-        else{$('cookieMsg').textContent='Salvo, mas SPX retornou: '+(d.erro||'erro');$('cookieMsg').className='msg err';}
-      }catch(e){$('cookieMsg').textContent='Enviado, mas não consegui confirmar (veja a URL).';$('cookieMsg').className='msg err';}
-    },1500);
-  }catch(e){$('cookieMsg').textContent='Falha ao enviar. Confira a URL do Web App.';$('cookieMsg').className='msg err';}
+  var cbName='_spxsave_'+Date.now();
+  window[cbName]=function(d){
+    delete window[cbName];
+    $('cookieMsg').textContent=d&&d.ok?'✓ Cookie salvo!':'⚠ '+(d&&d.faltando?'Faltam: '+d.faltando.join(', '):'Erro');
+    $('cookieMsg').className=d&&d.ok?'msg ok':'msg err';
+    if(d&&d.ok){$('cookieIn').value='';setTimeout(fetchReport,800);}
+  };
+  var s=document.createElement('script');
+  s.src=API+'?action=savecookie&cookie='+encodeURIComponent(c)+'&callback='+cbName;
+  s.onerror=function(){ delete window[cbName]; $('cookieMsg').textContent='Erro ao enviar.';$('cookieMsg').className='msg err'; };
+  document.head.appendChild(s);
 };
 
 init();
