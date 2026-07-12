@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Operação — Curitiba (tempo real)</title>
+<style>
+  :root{
+    --spx:#EE4D2D; --spx-d:#C43C1F; --ink:#15161A; --paper:#F6F5F2; --card:#fff;
+    --line:#E5E3DD; --muted:#6C6963; --ok:#1E8449; --wait:#B7791F; --miss:#C0392B;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Archivo',system-ui,sans-serif;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:760px;margin:0 auto;padding:20px 16px 60px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:3px solid var(--ink);padding-bottom:12px;margin-bottom:18px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px}
+  .logo{width:38px;height:38px;background:var(--spx);border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:900;font-size:18px}
+  h1{font-size:18px;font-weight:900;letter-spacing:-.02em}
+  h1 small{display:block;font-size:11px;font-weight:600;color:var(--muted)}
+  .live{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
+  .dot.stale{background:var(--miss);animation:none}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+  .report{background:var(--ink);color:#EDEBE6;border-radius:15px;padding:22px;font-family:var(--mono);font-size:14px;line-height:1.85;white-space:pre-wrap;overflow-x:auto}
+  .report .k{color:#9BE7B4}
+  .bar{display:flex;gap:9px;margin-top:12px;flex-wrap:wrap}
+  .btn{background:var(--ink);color:#fff;border:none;border-radius:9px;padding:10px 15px;font-family:'Archivo';font-weight:800;font-size:13px;cursor:pointer}
+  .btn.spx{background:var(--spx)} .btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:18px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
+  .stat .lab{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .stat .val{font-family:var(--mono);font-size:25px;font-weight:700;margin-top:2px}
+  .stat.ok .val{color:var(--ok)} .stat.wait .val{color:var(--wait)} .stat.spx .val{color:var(--spx)}
+  table{width:100%;border-collapse:collapse;margin-top:16px;background:var(--card);border-radius:12px;overflow:hidden;font-size:13px}
+  th{background:var(--ink);color:#fff;text-align:left;padding:8px 11px;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em}
+  th.n,td.n{text-align:right;font-family:var(--mono)}
+  td{padding:7px 11px;border-bottom:1px solid var(--line)}
+  tr:last-child td{border-bottom:none}
+  .tot td{font-weight:800;background:var(--paper)}
+
+  .cfg{margin-top:22px;background:#FFF6F3;border:1px solid #F5C7B8;border-radius:12px;padding:14px 16px;display:none}
+  .cfg.show{display:block}
+  .cfg h3{font-size:12px;font-weight:800;color:var(--spx-d);text-transform:uppercase;margin-bottom:8px}
+  .cfg textarea{width:100%;min-height:70px;font-family:var(--mono);font-size:12px;border:1.5px solid #EBB6A2;border-radius:8px;padding:9px;resize:vertical}
+  .cfg .row{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap}
+  .msg{font-size:12px;font-weight:700}
+  .msg.ok{color:var(--ok)} .msg.err{color:var(--miss)}
+  .warn{background:#FEF9E7;border:1px solid #F5DFA0;color:#7A5B10;border-radius:11px;padding:11px 14px;font-size:12.5px;margin-top:14px;display:none}
+  .warn.show{display:block}
+  .foot{font-size:11px;color:var(--muted);margin-top:20px;text-align:center;line-height:1.6}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(120px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:11px;font-weight:700;font-size:13px;transition:.28s;z-index:99}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+  .setup{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:16px;margin-bottom:18px}
+  .setup input{width:100%;font-family:var(--mono);font-size:12px;border:1.5px solid var(--line);border-radius:8px;padding:9px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><div class="logo">S</div>
+      <h1>Report Operação<small>LM Hub_PR_Curitiba · tempo real</small></h1>
+    </div>
+    <div class="live"><span class="dot" id="dot"></span><span id="liveTxt">conectando…</span></div>
+  </header>
+
+  <div class="setup" id="setup">
+    <b style="font-size:13px">Configuração inicial</b>
+    <p style="font-size:12px;color:var(--muted);margin-top:4px">Cole a URL do Web App do Apps Script (termina em <code>/exec</code>). Fica salva neste aparelho.</p>
+    <input id="apiUrl" placeholder="https://script.google.com/macros/s/.../exec">
+    <div style="margin-top:8px"><button class="btn spx" id="saveUrl">Salvar e conectar</button></div>
+  </div>
+
+  <div class="warn" id="warn"></div>
+
+  <div class="report" id="report">Carregando…</div>
+  <div class="bar">
+    <button class="btn spx" id="copy">📋 Copiar</button>
+    <button class="btn ghost" id="wa">WhatsApp</button>
+    <button class="btn ghost" id="refresh">↻ Atualizar agora</button>
+    <button class="btn ghost" id="toggleCfg">🔑 Cookie</button>
+  </div>
+
+  <div class="cfg" id="cfg">
+    <h3>Atualizar cookie do SPX</h3>
+    <p style="font-size:12px;color:var(--muted)">Quando o report parar de atualizar, cole aqui os cookies do SPX (F12 → Application → Cookies, ou a extensão de copiar cookie).</p>
+    <textarea id="cookieIn" placeholder="csrftoken=...; fms_user_skey=...; SPC_T_ID=...; ..."></textarea>
+    <div class="row">
+      <button class="btn spx" id="sendCookie">Enviar cookie</button>
+      <span class="msg" id="cookieMsg"></span>
+    </div>
+  </div>
+
+  <div class="grid" id="stats"></div>
+  <div id="blocks"></div>
+  <div class="foot" id="foot"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const LS_URL='spx_report_api_url';
+let API=localStorage.getItem(LS_URL)||'';
+let timer=null, lastData=null;
+
+function toast(m){$('toast').textContent=m;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),1600);}
+
+function init(){
+  if(API){$('setup').style.display='none';$('apiUrl').value=API;start();}
+  else{$('setup').style.display='block';$('report').textContent='Configure a URL do Web App para começar.';}
+}
+$('saveUrl').onclick=()=>{
+  const u=$('apiUrl').value.trim();
+  if(!/\/exec$/.test(u)){toast('URL precisa terminar em /exec');return;}
+  API=u;localStorage.setItem(LS_URL,u);$('setup').style.display='none';start();
+};
+$('toggleCfg').onclick=()=>$('cfg').classList.toggle('show');
+
+function start(){ fetchReport(); if(timer)clearInterval(timer); timer=setInterval(fetchReport,60000); }
+$('refresh').onclick=fetchReport;
+
+async function fetchReport(){
+  if(!API)return;
+  try{
+    const r=await fetch(API+'?action=report&t='+Date.now());
+    const d=await r.json();
+    if(!d.ok){ handleErr(d.erro||'erro'); return; }
+    lastData=d; render(d); setLive(true,d.atualizado_em);
+  }catch(e){ handleErr('sem_conexao'); }
+}
+
+function handleErr(code){
+  setLive(false);
+  const w=$('warn'); w.classList.add('show');
+  if(code==='cookie_ausente_ou_incompleto'){ w.innerHTML='⚠️ <b>Cookie expirado ou ausente.</b> Toque em 🔑 Cookie e cole um cookie novo do SPX.'; $('cfg').classList.add('show'); }
+  else if(code==='sem_conexao'){ w.innerHTML='⚠️ Sem conexão com o servidor. Verifique a URL do Web App.'; }
+  else{ w.innerHTML='⚠️ Erro: '+code; }
+}
+
+function setLive(ok,ts){
+  $('dot').classList.toggle('stale',!ok);
+  $('liveTxt').textContent = ok ? ('atualizado '+(ts||'')) : 'desatualizado';
+  if(ok)$('warn').classList.remove('show');
+}
+
+function render(d){
+  const b=d.blocos, order=[['NS_D1','NS D-1'],['AM','AM'],['PM','PM']];
+  const present=order.filter(([k])=>b[k]&&b[k].total>0);
+  const seg=sel=>present.map(([k,lab])=>`${sel(b[k])} (${lab})`).join(' + ');
+  const txt=
+`Status das: ${d.hora}h
+Início da expedição: 05:00
+ 
+📦 Total de Rotas: ${seg(x=>x.total)} = ${d.total.total}
+📦 Rotas expedidas: ${seg(x=>x.exp)} = ${d.total.exp}
+⏳ Rotas pendentes: ${d.total.pend}
+🖥️ Bancadas abertas: ${d.bancadas??'—'}
+📍 NS: ${seg(x=>x.ns)} = ${d.total.ns}
+🚘 Fila Driver interna: ${d.fila??'—'}`;
+  $('report').innerHTML=txt.replace(/📦|⏳|🖥️|📍|🚘/g,m=>`<span class="k">${m}</span>`);
+  $('report').dataset.raw=txt;
+
+  const pct=d.total.total?Math.round(d.total.exp/d.total.total*100):0;
+  $('stats').innerHTML=`
+    <div class="stat"><div class="lab">Total</div><div class="val">${d.total.total}</div></div>
+    <div class="stat ok"><div class="lab">Expedidas</div><div class="val">${d.total.exp}</div><div class="lab">${pct}%</div></div>
+    <div class="stat wait"><div class="lab">Pendentes</div><div class="val">${d.total.pend}</div></div>
+    <div class="stat spx"><div class="lab">NS</div><div class="val">${d.total.ns}</div></div>
+    <div class="stat"><div class="lab">Bancadas</div><div class="val">${d.bancadas??'—'}</div></div>
+    <div class="stat"><div class="lab">Fila</div><div class="val">${d.fila??'—'}</div></div>`;
+
+  let t=`<table><thead><tr><th>Bloco</th><th class="n">Total</th><th class="n">Exp.</th><th class="n">Aceita</th><th class="n">Recusa</th><th class="n">S/driver</th><th class="n">NS</th></tr></thead><tbody>`;
+  present.forEach(([k,lab])=>{const x=b[k];t+=`<tr><td><b>${lab}</b></td><td class="n">${x.total}</td><td class="n">${x.exp}</td><td class="n">${x.aceita||'—'}</td><td class="n">${x.recusa||'—'}</td><td class="n">${x.semDriver||'—'}</td><td class="n">${x.ns}</td></tr>`;});
+  t+=`<tr class="tot"><td>TOTAL</td><td class="n">${d.total.total}</td><td class="n">${d.total.exp}</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">${d.total.ns}</td></tr></tbody></table>`;
+  $('blocks').innerHTML=t;
+
+  // status vistos (ajuda a afinar a classificação) — só aparece se houver algum não reconhecido
+  const sv=d.status_vistos||{};
+  const svTxt=Object.keys(sv).length?('Status detectados no evento: '+Object.entries(sv).map(([k,v])=>`${k}=${v}`).join(' · ')):'';
+  $('foot').innerHTML=`Station 10047 · ${d.queue_ok?'fila/bancadas ao vivo':'⚠ fila/bancadas indisponível'} · atualiza a cada 60s`+(svTxt?`<br><span style="font-size:10px">${svTxt}</span>`:'');
+}
+
+$('copy').onclick=()=>{navigator.clipboard.writeText($('report').dataset.raw||'');toast('Copiado');};
+$('wa').onclick=()=>{const t=($('report').dataset.raw||'').replace(/📦|⏳|🖥️|📍|🚘/g,'').trim();window.open('https://wa.me/?text='+encodeURIComponent($('report').dataset.raw||''),'_blank');};
+
+$('sendCookie').onclick=async()=>{
+  const c=$('cookieIn').value.trim();
+  if(!c){$('cookieMsg').textContent='Cole o cookie.';$('cookieMsg').className='msg err';return;}
+  $('cookieMsg').textContent='Enviando…';$('cookieMsg').className='msg';
+  try{
+    const r=await fetch(API+'?action=savecookie&cookie='+encodeURIComponent(c));
+    const d=await r.json();
+    if(d.ok){$('cookieMsg').textContent='✓ Cookie salvo!';$('cookieMsg').className='msg ok';$('cookieIn').value='';setTimeout(fetchReport,800);}
+    else{$('cookieMsg').textContent='Faltando: '+(d.faltando||[]).join(', ');$('cookieMsg').className='msg err';}
+  }catch(e){$('cookieMsg').textContent='Erro ao enviar.';$('cookieMsg').className='msg err';}
+};
+
+init();
+</script>
+</body>
+</html>
