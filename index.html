@@ -155,15 +155,19 @@ function setLive(ok,ts){
 
 function render(d){
   var blocos=d.blocos||[];
-  // texto do report: NS mostra detalhe por dia
+  var ativos=blocos.filter(function(b){return !b.cancelado;});
+  var cancelados=blocos.filter(function(b){return b.cancelado;});
+  // texto do report
   var partes_total=[], partes_exp=[], partes_pend=[], partes_ns=[];
-  blocos.forEach(function(b){
-    var lbl = b.label;
+  ativos.forEach(function(b){
     var diasTxt = b.dias ? ' ('+b.dias+')' : '';
-    partes_total.push(b.total+' ('+lbl+diasTxt+')');
-    partes_exp.push(b.exp+' ('+lbl+')');
-    partes_pend.push(b.pend+' ('+lbl+diasTxt+')');
-    partes_ns.push(b.ns+' ('+lbl+')');
+    partes_total.push(b.total+' ('+b.label+diasTxt+')');
+    partes_exp.push(b.exp+' ('+b.label+')');
+    partes_pend.push(b.pend+' ('+b.label+diasTxt+')');
+    partes_ns.push(b.ns+' ('+b.label+')');
+  });
+  cancelados.forEach(function(b){
+    partes_total.push('SEM EXPEDIÇÃO ('+b.label+')');
   });
   var txt=
 'Status das: '+d.hora+'h\n'+
@@ -186,6 +190,10 @@ function render(d){
     '<div class=\"stat\"><div class=\"lab\">Fila</div><div class=\"val\">'+(d.fila!=null?d.fila:'—')+'</div></div>';
   var t='<table><thead><tr><th>Bloco</th><th class=\"n\">Total</th><th class=\"n\">Exp.</th><th class=\"n\">Pend.</th><th class=\"n\">NS</th></tr></thead><tbody>';
   blocos.forEach(function(b){
+    if(b.cancelado){
+      t+='<tr><td><b>'+b.label+'</b></td><td class=\"n\" colspan=\"4\" style=\"color:#C0392B;text-align:center\">SEM EXPEDIÇÃO HOJE</td></tr>';
+      return;
+    }
     var diasInfo = b.dias ? '<br><span style=\"font-size:11px;color:#6C6963\">'+b.dias+'</span>' : '';
     t+='<tr><td><b>'+b.label+'</b>'+diasInfo+'</td><td class=\"n\">'+b.total+'</td><td class=\"n\">'+b.exp+'</td><td class=\"n\">'+b.pend+'</td><td class=\"n\">'+b.ns+'</td></tr>';
   });
