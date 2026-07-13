@@ -154,40 +154,34 @@ function setLive(ok,ts){
 }
 
 function render(d){
-  const b=d.blocos, order=[['NS_D1','NS D-1'],['AM','AM'],['PM','PM']];
-  const present=order.filter(([k])=>b[k]&&b[k].total>0);
-  const seg=sel=>present.map(([k,lab])=>`${sel(b[k])} (${lab})`).join(' + ');
-  const txt=
-`Status das: ${d.hora}h
-Início da expedição: 05:00
- 
-📦 Total de Rotas: ${seg(x=>x.total)} = ${d.total.total}
-📦 Rotas expedidas: ${seg(x=>x.exp)} = ${d.total.exp}
-⏳ Rotas pendentes: ${d.total.pend}
-🖥️ Bancadas abertas: ${d.bancadas??'—'}
-📍 NS: ${seg(x=>x.ns)} = ${d.total.ns}
-🚘 Fila Driver interna: ${d.fila??'—'}`;
-  $('report').innerHTML=txt.replace(/📦|⏳|🖥️|📍|🚘/g,m=>`<span class="k">${m}</span>`);
+  var blocos=d.blocos||[];
+  var seg=function(field){ return blocos.map(function(b){return b[field]+' ('+b.label+')';}).join(' + '); };
+  var txt=
+'Status das: '+d.hora+'h\n'+
+'Início da expedição: 05:00\n \n'+
+'📦 Total de Rotas: '+seg('total')+' = '+d.total.total+'\n'+
+'📦 Rotas expedidas: '+seg('exp')+' = '+d.total.exp+'\n'+
+'⏳ Rotas pendentes: '+seg('pend')+' = '+d.total.pend+'\n'+
+'🖥️ Bancadas abertas: '+(d.bancadas!=null?d.bancadas:'—')+'\n'+
+'📍 NS: '+seg('ns')+' = '+d.total.ns+'\n'+
+'🚘 Fila Driver interna: '+(d.fila!=null?d.fila:'—');
+  $('report').innerHTML=txt.replace(/📦|⏳|🖥️|📍|🚘/g,function(m){return '<span class=\"k\">'+m+'</span>';});
   $('report').dataset.raw=txt;
-
-  const pct=d.total.total?Math.round(d.total.exp/d.total.total*100):0;
-  $('stats').innerHTML=`
-    <div class="stat"><div class="lab">Total</div><div class="val">${d.total.total}</div></div>
-    <div class="stat ok"><div class="lab">Expedidas</div><div class="val">${d.total.exp}</div><div class="lab">${pct}%</div></div>
-    <div class="stat wait"><div class="lab">Pendentes</div><div class="val">${d.total.pend}</div></div>
-    <div class="stat spx"><div class="lab">NS</div><div class="val">${d.total.ns}</div></div>
-    <div class="stat"><div class="lab">Bancadas</div><div class="val">${d.bancadas??'—'}</div></div>
-    <div class="stat"><div class="lab">Fila</div><div class="val">${d.fila??'—'}</div></div>`;
-
-  let t=`<table><thead><tr><th>Bloco</th><th class="n">Total</th><th class="n">Exp.</th><th class="n">Aceita</th><th class="n">Recusa</th><th class="n">S/driver</th><th class="n">NS</th></tr></thead><tbody>`;
-  present.forEach(([k,lab])=>{const x=b[k];t+=`<tr><td><b>${lab}</b></td><td class="n">${x.total}</td><td class="n">${x.exp}</td><td class="n">${x.aceita||'—'}</td><td class="n">${x.recusa||'—'}</td><td class="n">${x.semDriver||'—'}</td><td class="n">${x.ns}</td></tr>`;});
-  t+=`<tr class="tot"><td>TOTAL</td><td class="n">${d.total.total}</td><td class="n">${d.total.exp}</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">${d.total.ns}</td></tr></tbody></table>`;
+  var pct=d.total.total?Math.round(d.total.exp/d.total.total*100):0;
+  $('stats').innerHTML=
+    '<div class=\"stat\"><div class=\"lab\">Total</div><div class=\"val\">'+d.total.total+'</div></div>'+
+    '<div class=\"stat ok\"><div class=\"lab\">Expedidas</div><div class=\"val\">'+d.total.exp+'</div><div class=\"lab\">'+pct+'%</div></div>'+
+    '<div class=\"stat wait\"><div class=\"lab\">Pendentes</div><div class=\"val\">'+d.total.pend+'</div></div>'+
+    '<div class=\"stat spx\"><div class=\"lab\">NS</div><div class=\"val\">'+d.total.ns+'</div></div>'+
+    '<div class=\"stat\"><div class=\"lab\">Bancadas</div><div class=\"val\">'+(d.bancadas!=null?d.bancadas:'—')+'</div></div>'+
+    '<div class=\"stat\"><div class=\"lab\">Fila</div><div class=\"val\">'+(d.fila!=null?d.fila:'—')+'</div></div>';
+  var t='<table><thead><tr><th>Bloco</th><th class=\"n\">Total</th><th class=\"n\">Exp.</th><th class=\"n\">Pend.</th><th class=\"n\">NS</th></tr></thead><tbody>';
+  blocos.forEach(function(b){t+='<tr><td><b>'+b.label+'</b></td><td class=\"n\">'+b.total+'</td><td class=\"n\">'+b.exp+'</td><td class=\"n\">'+b.pend+'</td><td class=\"n\">'+b.ns+'</td></tr>';});
+  t+='<tr class=\"tot\"><td>TOTAL</td><td class=\"n\">'+d.total.total+'</td><td class=\"n\">'+d.total.exp+'</td><td class=\"n\">'+d.total.pend+'</td><td class=\"n\">'+d.total.ns+'</td></tr></tbody></table>';
   $('blocks').innerHTML=t;
-
-  // status vistos (ajuda a afinar a classificação) — só aparece se houver algum não reconhecido
-  const sv=d.status_vistos||{};
-  const svTxt=Object.keys(sv).length?('Status detectados no evento: '+Object.entries(sv).map(([k,v])=>`${k}=${v}`).join(' · ')):'';
-  $('foot').innerHTML=`Station 10047 · ${d.queue_ok?'fila/bancadas ao vivo':'⚠ fila/bancadas indisponível'} · atualiza a cada 60s`+(svTxt?`<br><span style="font-size:10px">${svTxt}</span>`:'');
+  var sv=d.status_vistos||{};
+  var svTxt=Object.keys(sv).length?('Status: '+Object.keys(sv).map(function(k){return k+'='+sv[k];}).join(' ')):'';
+  $('foot').innerHTML='Station 10047 · '+(d.queue_ok?'fila/bancadas ao vivo':'fila/bancadas indisponivel')+' · atualiza a cada 60s'+(svTxt?'<br><span style=\"font-size:10px\">'+svTxt+'</span>':'');
 }
 
 $('copy').onclick=()=>{navigator.clipboard.writeText($('report').dataset.raw||'');toast('Copiado');};
