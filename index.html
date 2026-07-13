@@ -155,15 +155,24 @@ function setLive(ok,ts){
 
 function render(d){
   var blocos=d.blocos||[];
-  var seg=function(field){ return blocos.map(function(b){return b[field]+' ('+b.label+')';}).join(' + '); };
+  // texto do report: NS mostra detalhe por dia
+  var partes_total=[], partes_exp=[], partes_pend=[], partes_ns=[];
+  blocos.forEach(function(b){
+    var lbl = b.label;
+    var diasTxt = b.dias ? ' ('+b.dias+')' : '';
+    partes_total.push(b.total+' ('+lbl+diasTxt+')');
+    partes_exp.push(b.exp+' ('+lbl+')');
+    partes_pend.push(b.pend+' ('+lbl+diasTxt+')');
+    partes_ns.push(b.ns+' ('+lbl+')');
+  });
   var txt=
 'Status das: '+d.hora+'h\n'+
 'Início da expedição: 05:00\n \n'+
-'📦 Total de Rotas: '+seg('total')+' = '+d.total.total+'\n'+
-'📦 Rotas expedidas: '+seg('exp')+' = '+d.total.exp+'\n'+
-'⏳ Rotas pendentes: '+seg('pend')+' = '+d.total.pend+'\n'+
+'📦 Total de Rotas: '+partes_total.join(' + ')+' = '+d.total.total+'\n'+
+'📦 Rotas expedidas: '+partes_exp.join(' + ')+' = '+d.total.exp+'\n'+
+'⏳ Rotas pendentes: '+partes_pend.join(' + ')+' = '+d.total.pend+'\n'+
 '🖥️ Bancadas abertas: '+(d.bancadas!=null?d.bancadas:'—')+'\n'+
-'📍 NS: '+seg('ns')+' = '+d.total.ns+'\n'+
+'📍 NS: '+partes_ns.join(' + ')+' = '+d.total.ns+'\n'+
 '🚘 Fila Driver interna: '+(d.fila!=null?d.fila:'—');
   $('report').innerHTML=txt.replace(/📦|⏳|🖥️|📍|🚘/g,function(m){return '<span class=\"k\">'+m+'</span>';});
   $('report').dataset.raw=txt;
@@ -176,7 +185,10 @@ function render(d){
     '<div class=\"stat\"><div class=\"lab\">Bancadas</div><div class=\"val\">'+(d.bancadas!=null?d.bancadas:'—')+'</div></div>'+
     '<div class=\"stat\"><div class=\"lab\">Fila</div><div class=\"val\">'+(d.fila!=null?d.fila:'—')+'</div></div>';
   var t='<table><thead><tr><th>Bloco</th><th class=\"n\">Total</th><th class=\"n\">Exp.</th><th class=\"n\">Pend.</th><th class=\"n\">NS</th></tr></thead><tbody>';
-  blocos.forEach(function(b){t+='<tr><td><b>'+b.label+'</b></td><td class=\"n\">'+b.total+'</td><td class=\"n\">'+b.exp+'</td><td class=\"n\">'+b.pend+'</td><td class=\"n\">'+b.ns+'</td></tr>';});
+  blocos.forEach(function(b){
+    var diasInfo = b.dias ? '<br><span style=\"font-size:11px;color:#6C6963\">'+b.dias+'</span>' : '';
+    t+='<tr><td><b>'+b.label+'</b>'+diasInfo+'</td><td class=\"n\">'+b.total+'</td><td class=\"n\">'+b.exp+'</td><td class=\"n\">'+b.pend+'</td><td class=\"n\">'+b.ns+'</td></tr>';
+  });
   t+='<tr class=\"tot\"><td>TOTAL</td><td class=\"n\">'+d.total.total+'</td><td class=\"n\">'+d.total.exp+'</td><td class=\"n\">'+d.total.pend+'</td><td class=\"n\">'+d.total.ns+'</td></tr></tbody></table>';
   $('blocks').innerHTML=t;
   var sv=d.status_vistos||{};
